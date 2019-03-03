@@ -29,11 +29,11 @@ def build_model():
             i1=chars[c1]
             i2=chars[c2]
             #count c matrix
-            c_matrix[i1][i2]+=1
-    
+            _______________
+    #build p matrix
     for i in range(4000):
-        sum_=np.sum(c_matrix[i,:])
-        p_matrix[i]=c_matrix[i]/sum_
+        _________________
+        _________________
    
     return p_matrix,chars
 
@@ -49,7 +49,8 @@ def test(model):
                 c1,c2=s[i],s[i+1]
                 i1=chars[c1]
                 i2=chars[c2]
-                prob*=p_matrix[i1][i2]
+                #calc prob
+                _________________
                 print c1,c2,p_matrix[i1][i2]
 
             print line,prob
