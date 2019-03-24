@@ -4,8 +4,14 @@ import json
 import numpy as np
 import os
 
+def segmentation(s):
+    segments=[c for c in s]
+    segments.insert(0,'<BOS>')
+    segments.append('<EOS>')
+    return segments
+
 def build_model():
-    chars={'<BOS>':0,'<EOS>':1}
+    chars={'<BOS>':0,'<EOS>':1,'<UNK>':2}
     sentences=[]
     files=os.listdir(args.corpus)
     print files
@@ -30,9 +36,7 @@ def build_model():
 
     #build language model
     for s in sentences:
-        segments=[c for c in s]
-        segments.insert(0,'<BOS>')
-        segments.append('<EOS>')
+        segments=segmentation(s)
         for i in range(len(segments)-1):
             c1,c2=segments[i],segments[i+1]
             i1=chars[c1]
@@ -48,27 +52,39 @@ def build_model():
 
 def test(model):
     p_matrix,chars=model
-    with open(args.testfile,'r') as f:
+    total_pp=0.
+    n_sentence=0
+    with open(args.test_file,'r') as f:
         lines=f.readlines()
         for line in lines:
-            eprob=0.
-            s=line.strip().decode('utf-8')
-            segments=[c for c in s]
-            segments.insert(0,'<BOS>')
-            segments.append('<EOS>')
-            str_=''
-            for s in segments:
-                str_+=s
-            print len(segments),str_
-            for i in range(len(segments)-1):
-                c1,c2=segments[i],segments[i+1]
-                i1=chars[c1]
-                i2=chars[c2]
-                #calc prob
-                eprob+=np.log(p_matrix[i1][i2])
-                print c1,c2,p_matrix[i1][i2]
+            data=json.loads(line)
+            text=data['text']
+            sen=text.split('\n')
+            for s in sen:
+                if len(s.strip())>0:
+                    eprob=0.
+                    segments=segmentation(s)
+                    str_=''
+                    for s in segments:
+                        str_+=s
+                    for i in range(len(segments)-1):
+                        c1,c2=segments[i],segments[i+1]
+                        if c1 in chars:
+                            i1=chars[c1]
+                        else:
+                            i1=2 #UNK
+                        if c2 in chars:
+                            i2=chars[c2]
+                        else:
+                            i2=2 #UNK
+                        #calc prob
+                        eprob+=np.log(p_matrix[i1][i2])
+                    epp=-eprob/(len(segments)-1)
+                    print epp,eprob,str_
+                    n_sentence+=1
+                    total_pp+=(epp-total_pp)/n_sentence
+    print n_sentence,total_pp
 
-            print line,eprob
 
 def maximun_generate(model):
     p_mat,chars=model
@@ -98,11 +114,11 @@ def maximun_generate(model):
 if __name__=='__main__':
     argparser = argparse.ArgumentParser(sys.argv[0])
     argparser.add_argument('--corpus',type=str,default='corpus')
-    argparser.add_argument('--testfile',type=str,default='test.txt')
     argparser.add_argument('--prefix_file', type=str,default='prefix.txt')
+    argparser.add_argument('--test_file',type=str,default='wiki_10')
     args = argparser.parse_args()
     print args
 
     model=build_model()
-    #test(model)
-    maximun_generate(model)
+    test(model)
+    #maximun_generate(model)
