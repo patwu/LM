@@ -98,8 +98,8 @@ if __name__=='__main__':
 
     argparser.add_argument('--n_emb',type=int,default=32)
     argparser.add_argument('--vocab_size', type=int,default=7000)
-    argparser.add_argument('--n_hidden', type=int,default=32)
-    argparser.add_argument('--batch_size', type=int,default=128)
+    argparser.add_argument('--n_hidden', type=int,default=128)
+    argparser.add_argument('--batch_size', type=int,default=64)
 
     args = argparser.parse_args()
     print args

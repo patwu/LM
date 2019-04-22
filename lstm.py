@@ -40,7 +40,7 @@ class LSTMLM(object):
             self.preds=tf.nn.softmax(logits)    
            
             self.loss=self._loss(logits[:,:self.args.max_length-1],batch_x[:,1:],mask_x)
-            opt = tf.train.AdamOptimizer()
+            opt = tf.train.AdamOptimizer(0.01)
             grads = opt.compute_gradients(self.loss)
             self.train_step=opt.apply_gradients(grads, global_step=self.global_step)
 
