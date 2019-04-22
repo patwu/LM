@@ -1,9 +1,12 @@
-import sys 
 import argparse
 import json
 import numpy as np
 import os
-import lstm 
+import sys
+import pickle
+import copy
+
+from lstm import LSTMLM
 
 def segmentation(s):
     segments=[c for c in s]
@@ -12,8 +15,12 @@ def segmentation(s):
     return segments
 
 def build_model():
+    lstm=LSTMLM(args)
+    lstm.build_model()
+
     chars={'<BOS>':0,'<EOS>':1,'<UNK>':2}
     sentences=[]
+    sids=[]
     files=os.listdir(args.corpus)
     print files
     for file_ in files:
@@ -28,59 +35,37 @@ def build_model():
                 for s in sen:
                     if len(s.strip())>0:
                         sentences.append(s)
+                        sid=[0]
                         for c in s:
                             if not c in chars:
                                 chars[c]=len(chars)
+                            sid.append(chars[c])
+                        sid.append(1)
+                        sids.append(sid)
     n_char=len(chars)
-    print n_char
-    
-    lstm=LSTMLM(self.args)
-    
-    for _ in range(1000):
-        batch_sen=np.random.choice(sentences)
-        loss=lstm.train(batch_sen) 
-        print loss    
+    print 'vocabulary_size=%d'%n_char
+    rchars={chars[c]:c for c in chars}
+
+    for i in range(5000):
+        batch_sen=np.random.choice(sids,size=args.batch_size)
+        batch_sen=[copy.copy(s) for s in batch_sen]
+        loss=lstm.train(batch_sen)
+        if i%10==0:
+            print i,loss    
+    lstm.save_model('model')
+    pickle.dump(chars,open('chars.pkl','wb'))
     return lstm,chars
 
-def test(model):
-    p_matrix,chars=model
-    total_pp=0.
-    n_sentence=0
-    with open(args.test_file,'r') as f:
-        lines=f.readlines()
-        for line in lines:
-            data=json.loads(line)
-            text=data['text']
-            sen=text.split('\n')
-            for s in sen:
-                if len(s.strip())>0:
-                    eprob=0.
-                    segments=segmentation(s)
-                    str_=''
-                    for s in segments:
-                        str_+=s
-                    for i in range(len(segments)-1):
-                        c1,c2=segments[i],segments[i+1]
-                        if c1 in chars:
-                            i1=chars[c1]
-                        else:
-                            i1=2 #UNK
-                        if c2 in chars:
-                            i2=chars[c2]
-                        else:
-                            i2=2 #UNK
-                        #calc prob
-                        eprob+=np.log(p_matrix[i1][i2])
-                    epp=-eprob/(len(segments)-1)
-                    print epp,eprob,str_
-                    n_sentence+=1
-                    total_pp+=(epp-total_pp)/n_sentence
-    print n_sentence,total_pp
+def maximun_generate():
+    lstm=LSTMLM(args)
+    lstm.build_model()
+    lstm.load_model('model')
+    chars=pickle.load(open('chars.pkl','rb'))
 
-
-def maximun_generate(model):
-    p_mat,chars=model
     rchars={chars[c]:c for c in chars}
+    while len(rchars)<args.vocab_size:
+        rchars[len(rchars)]='<ERR>'
+
     with open(args.prefix_file,'r') as f:
         lines=f.readlines()
         for line in lines:
@@ -92,54 +77,34 @@ def maximun_generate(model):
             for s in segments:
                 str_+=s
             prefix=str_
-            i1=chars[segments[-1]]
-            while i1!=1 and len(str_)<50:
-                i2=np.random.choice(range(len(chars)),p=p_mat[i1])
-                c2=rchars[i2]
-                str_+=c2
-                i1=i2
-            print prefix,str_
+            
+            ids=[chars[s] for s in segments]
+            while len(ids)<args.max_length and ids[-1]!=1:
+                dist=lstm.next_char([copy.copy(ids)])[0]
+                i2=np.random.choice(range(len(rchars)),p=dist)
+                eprob+=np.log(dist[i2])
+                ids.append(i2)
+                str_+=rchars[i2]
+            print prefix,eprob,str_
 
-def beam_generate(model):
-    p_mat,chars=model
-    rchars={chars[c]:c for c in chars}
-    with open(args.prefix_file,'r') as f:
-        lines=f.readlines()
-        for line in lines:
-            s=line.strip().decode('utf-8')
-            segments=[c for c in s]
-            segments.insert(0,'<BOS>')
-            prefix=''.join(segments)
-            i1=chars[segments[-1]]
-            beam=[(i1,prefix,0.)]
-            result=[]
-            while len(result)<10:
-                nbeam=[]
-                for b in beam:
-                    i1,str_,eprob=b;
-                    i2_list=np.random.choice(a=range(len(chars)),size=args.beam_width,p=p_mat[i1],replace=False)
-                    for i2 in i2_list:
-                        c2=rchars[i2]
-                        nstr_=str_+c2
-                        neprob=eprob+np.log(p_mat[i1,i2])
-                        if i2==1 or len(nstr_)>50:
-                            result.append((nstr_,neprob))
-                        else:
-                            nbeam.append((i2,nstr_,neprob))
-                nbeam=sorted(nbeam,key=lambda be:be[2],reverse=True)
-                beam=nbeam[:args.beam_width]
-            for str_,eprob in result:
-                print eprob,str_
 if __name__=='__main__':
     argparser = argparse.ArgumentParser(sys.argv[0])
     argparser.add_argument('--corpus',type=str,default='corpus')
     argparser.add_argument('--prefix_file', type=str,default='prefix.txt')
     argparser.add_argument('--test_file',type=str,default='wiki_10')
     argparser.add_argument('--beam_width',type=int,default=5)
+
+    argparser.add_argument('--max_length',type=int,default=64)
+
+    argparser.add_argument('--n_emb',type=int,default=32)
+    argparser.add_argument('--vocab_size', type=int,default=7000)
+    argparser.add_argument('--n_hidden', type=int,default=32)
+    argparser.add_argument('--batch_size', type=int,default=128)
+
     args = argparser.parse_args()
     print args
 
     model=build_model()
     #test(model)
-    #maximun_generate(model)
+    maximun_generate()
     #beam_generate(model)
