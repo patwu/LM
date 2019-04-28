@@ -31,7 +31,7 @@ class LSTMLM(object):
             mask_x = self.mask_x = tf.placeholder(tf.float32, shape=[self.args.batch_size,self.args.max_length-1],name='mask_x')
             global_step = self.global_step= tf.Variable(0, name='global_step', trainable=False)
 
-            embedding = tf.get_variable("embedding", [self.args.vocab_size, self.args.n_emb], dtype=tf.float32)
+            self.embedding = embedding = tf.get_variable("embedding", [self.args.vocab_size, self.args.n_emb], dtype=tf.float32)
             batch_emb = tf.nn.embedding_lookup(embedding, batch_x)
             with tf.variable_scope('lstm') as scope:
                 cell = tf.contrib.rnn.BasicLSTMCell(self.args.n_hidden)
@@ -71,7 +71,10 @@ class LSTMLM(object):
         for i in range(n_valid):
             next_.append(preds[i,len_[i]-1])
         return next_
-       
+
+    def get_vector(self):
+        return self.sess.run(self.embedding)
+
     def train(self,sentence):
         len_=[]
         mask=[] 

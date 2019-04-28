@@ -104,7 +104,7 @@ if __name__=='__main__':
     args = argparser.parse_args()
     print args
 
-    model=build_model()
+    #model=build_model()
     #test(model)
     maximun_generate()
     #beam_generate(model)
