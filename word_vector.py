@@ -23,7 +23,7 @@ def nearest_neighbor():
     
     dists=[]
 
-    for i in range(args.vocab_size):
+    for i in range(6000):
         dis=np.sum((vectors[i]-vectors[args.word_id])**2)
         dists.append((dis,rchars[i]))
     dists=sorted(dists,key=lambda tup:tup[0])
