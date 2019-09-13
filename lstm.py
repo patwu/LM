@@ -30,25 +30,27 @@ class LSTMLM(object):
             len_x = self.len_x = tf.placeholder(tf.int64, shape=[self.args.batch_size],name='len_x')
             mask_x = self.mask_x = tf.placeholder(tf.float32, shape=[self.args.batch_size,self.args.max_length-1],name='mask_x')
             global_step = self.global_step= tf.Variable(0, name='global_step', trainable=False)
+            
+            with tf.device('/gpu:0'):
 
-            self.embedding = embedding = tf.get_variable("embedding", [self.args.vocab_size, self.args.n_emb], dtype=tf.float32)
-            batch_emb = tf.nn.embedding_lookup(embedding, batch_x)
-            with tf.variable_scope('lstm') as scope:
-                cell = tf.contrib.rnn.BasicLSTMCell(self.args.n_hidden)
-                outputs,_ = tf.nn.dynamic_rnn(cell=cell,sequence_length=len_x,inputs=batch_emb,dtype=tf.float32)
-            logits=tf.contrib.layers.fully_connected(outputs,self.args.vocab_size,activation_fn=None)
-            self.preds=tf.nn.softmax(logits)    
+                self.embedding = embedding = tf.get_variable("embedding", [self.args.vocab_size, self.args.n_emb], dtype=tf.float32)
+                batch_emb = tf.nn.embedding_lookup(embedding, batch_x)
+                with tf.variable_scope('lstm') as scope:
+                    cell = tf.contrib.rnn.BasicLSTMCell(self.args.n_hidden)
+                    outputs,_ = tf.nn.dynamic_rnn(cell=cell,sequence_length=len_x,inputs=batch_emb,dtype=tf.float32)
+                logits=tf.contrib.layers.fully_connected(outputs,self.args.vocab_size,activation_fn=None)
+                self.preds=tf.nn.softmax(logits)    
            
-            self.loss=self._loss(logits[:,:self.args.max_length-1],batch_x[:,1:],mask_x)
-            opt = tf.train.AdamOptimizer(0.01)
-            grads = opt.compute_gradients(self.loss)
-            self.train_step=opt.apply_gradients(grads, global_step=self.global_step)
+                self.loss=self._loss(logits[:,:self.args.max_length-1],batch_x[:,1:],mask_x)
+                opt = tf.train.AdamOptimizer(0.01)
+                grads = opt.compute_gradients(self.loss)
+                self.train_step=opt.apply_gradients(grads, global_step=self.global_step)
 
-            self.next=self.preds
+                self.next=self.preds
 
             init = tf.global_variables_initializer()
             self.sess.run(init)
-            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
+            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
              
 
     def next_char(self,sentence):
